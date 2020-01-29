@@ -1,2 +1,4 @@
 .vscode/
 /login_data.txt
+tmp/
+test.py

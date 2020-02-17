@@ -102,12 +102,6 @@ def get_files(full_speed=False, test_run=False):
             sleep(pause)
     return
 
-def render_pdf():
-    return
-
-def render_pdf_page():
-    return
-
 def setup_args():
     parser = argparse.ArgumentParser(description='Download libri EDRA')
     parser.add_argument('-t', '--test-run', action='store_true')
@@ -139,7 +133,6 @@ def main():
     book['ISBN'] = args.ISBN
     get_info()
     get_files(full_speed=args.full_speed, test_run=args.test_run )
-    # render_pdf()
     return
 
 if __name__ == '__main__':

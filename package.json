@@ -1,0 +1,26 @@
+{
+  "name": "edra-dl",
+  "version": "1.0.0",
+  "description": "EDRA books downloader",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacopodonati/edra-dl.git"
+  },
+  "author": "Jacopo Donati",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jacopodonati/edra-dl/issues"
+  },
+  "homepage": "https://github.com/jacopodonati/edra-dl#readme",
+  "dependencies": {
+    "commander": "^4.1.0",
+    "fs": "0.0.1-security",
+    "node-fetch": "^2.6.0",
+    "pad": "^3.2.0",
+    "puppeteer": "^2.1.1"
+  }
+}

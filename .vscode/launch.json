@@ -7,32 +7,14 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Avvia programma (full speed)",
-            "program": "${workspaceFolder}/main.js",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "args": ["--isbn=9788821447167", "-f"]
-        },
-        {
-            "type": "node",
-            "request": "launch",
             "name": "Avvia programma",
             "skipFiles": [
                 "<node_internals>/**"
             ],
+            "outputCapture": "std",
+            "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821447167"]
-        },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Avvia programma (test run)",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821447167", "-t"]
+            "args": ["--isbn=9788821447167", "--verbose", "--test-run"]
         }
     ]
 }

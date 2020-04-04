@@ -5,22 +5,6 @@
 
 "use strict";
 
-// 9788821447167
-// 6d7e16ec9967fedf470bc3615dd9e193
-
-/*******************************************************************************
- *  TODO: Aggiungere la possibilità di effettuare il download di un intervallo
- *        di pagine definito.
- ******************************************************************************/
-
-/* Some libraries I need:
- * - Winston: to implement a logger
- * - Commander: to handle arguments passed from commandline
- * - Fetch: needed to get the Files
- * - Fs: to save the file
- * - Pad: to format a number so it has enough zeros in front of it
- */
-
 const winston = require('winston')
 const commander = require('commander');
 const program = new commander.Command();
@@ -28,7 +12,6 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const pad = require('pad');
 
-// Setup the logger. Don't need anything too complex.
 const logger = winston.createLogger({
     level: 'info',
     transports: [
@@ -44,11 +27,10 @@ const logger = winston.createLogger({
 main();
 
 async function main() {
-    logger.info('EDRA-dl');
+    logger.debug('EDRA-dl');
 
     logger.debug('Setting up Program');
 
-    // The only argument we need is the ISBN to download.
     program
         .version('1.0.0')
         .requiredOption('-i, --isbn [ISBN code]', 'ISBN del libro')
@@ -65,15 +47,20 @@ async function main() {
         logger.level = 'debug';
     }
 
-    logger.debug('Getting book info', {
+    logger.info('Getting book info', {
         ISBN: isbn
     });
-    // First of all, we get the info so we know how many pages are there.
     var book = await getInfo(isbn);
     if (!program.getInfo) {
-        logger.debug('Starting file download');
-        // Then we download them all.
-        await getFiles(book);
+        logger.info('Starting file download');
+        const PDFMerger = require('pdf-merger-js');
+        var merger = new PDFMerger();
+        await getFiles(book, merger);
+        logger.info('Merging all pages into one');
+        await merger.save(`${book.title}.pdf`);
+        var tmpRootDir = './tmp/';
+        logger.debug('Remove temporary files');
+        await fs.rmdir(tmpRootDir, {recursive: true});
         logger.info('Done.');
     } else {
         printInfo(book);
@@ -81,23 +68,16 @@ async function main() {
 }
 
 async function getInfo(isbn) {
-    // This variable will contain every info about hte book we're about to download.
     var book = {
         isbn: isbn
     }
 
-    // We have two sources for the info we need:
-    //   1.  toc contains the title
-    //   2.  pages contains everything else, included which pages only have a
-    //       background image, and which have also a foreground (aka text)
-    // mock is somekind of signature the server need. It doesn't get checked, though.
     book.sources = {
         toc: `https://www.edravet.it/fb/${book.isbn}/files/assets/html/workspace.js`,
         pages: `https://www.edravet.it/fb//${book.isbn}/files/assets/common/pager.js`,
         mock: '?uni=6d7e16ec9967fedf470bc3615dd9e193'
     }
 
-    // We also need to spoof our User-Agent or the server response will be malformed.
     var options = {
         headers: {
             'Content-Type': 'application/javascript',
@@ -105,12 +85,12 @@ async function getInfo(isbn) {
         }
     };
 
-    logger.debug(`Scarico la TOC da ${book.sources.toc}`);
+    logger.debug(`Downloading TOC from ${book.sources.toc}`);
     var response = await fetch(book.sources.toc + book.sources.mock, options);
     var data = await response.json();
     book.title = data.title;
 
-    logger.debug(`Scarico le pagine da ${book.sources.pages}`);
+    logger.debug(`Downloading page list from ${book.sources.pages}`);
     var response = await fetch(book.sources.pages + book.sources.mock, options);
     var data = await response.json();
     var px2mm = 2.83;
@@ -119,12 +99,9 @@ async function getInfo(isbn) {
     book.realSize.width = Math.round(book.size.width / px2mm);
     book.realSize.height = Math.round(book.size.height / px2mm);
     var pages = data.pages;
-    // We delete uneeded content
     delete pages['defaults'];
     delete pages['structure'];
     book.pages = []
-    // Then we cycle through the pages so we know for which we'll have to
-    // download the text.
     for (var number in pages) {
         var hasText = false;
         if (pages[number].hasOwnProperty('textLayer')) {
@@ -139,7 +116,7 @@ async function getInfo(isbn) {
     return book;
 }
 
-async function getFiles(book) {
+async function getFiles(book, merger) {
     var tmpRootDir = './tmp/';
     var tmpDir = tmpRootDir + book.isbn;
     var options = {
@@ -149,11 +126,11 @@ async function getFiles(book) {
     };
 
     if (!fs.existsSync(tmpRootDir)) {
-        logger.debug(`Creo la cartella ${tmpRootDir}`);
+        logger.debug(`Making ${tmpRootDir}`);
         fs.mkdirSync(tmpRootDir);
     }
     if (!fs.existsSync(tmpDir)) {
-        logger.debug(`Creo la cartella ${tmpDir}`);
+        logger.debug(`Making ${tmpDir}`);
         fs.mkdirSync(tmpDir);
     }
 
@@ -163,6 +140,7 @@ async function getFiles(book) {
     }
 
     for (var i = 0; i < lastPage; i++) {
+        logger.info(`Downloading page no. ${book.pages[i].number} of ${lastPage}`);
         var foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
         var background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
         var foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-foreground.svg`;
@@ -170,7 +148,7 @@ async function getFiles(book) {
         var foreground_path = `${tmpDir}/${foreground_filename}`;
         var background_path = `${tmpDir}/${background_filename}`;
 
-        logger.debug(`Scarico lo sfondo di pagina n. ${book.pages[i].number}`);
+        logger.debug('Downloading the background');
         if (!program.dryRun) {
             await fetch(background_url + book.sources.mock, options)
                 .then(res => {
@@ -180,7 +158,7 @@ async function getFiles(book) {
         }
 
         if (book.pages[i].hasText) {
-            logger.debug(`Scarico il testo di pagina n. ${book.pages[i].number}`);
+            logger.debug('Downloading the text');
             await fetch(foreground_url + book.sources.mock, options)
                 .then(res => res.text())
                 .then(body => {
@@ -190,12 +168,13 @@ async function getFiles(book) {
                 })
                 .catch(err => console.log(err));
         } else {
-            logger.debug(`La pagina n. ${book.pages[i].number} è priva di testo`);
+            logger.debug(`Page no. ${book.pages[i].number} has no text`);
         }
 
         var background = background_path;
         var foreground = book.pages[i].hasText ? foreground_path : false;
-        await merge(book, book.pages[i].number, foreground, background);
+
+        await merge(book, merger, book.pages[i].number, foreground, background);
 
         if (!program.fullSpeed) {
             await sleep(false);
@@ -207,7 +186,7 @@ function sleep(length) {
     var ms;
     if (length === false) {
         ms = Math.random() * (8000 - 2000) + 2000;
-        logger.debug(`Pausa di ${Math.round(ms / 1000)} secondi`);
+        logger.info(`Pausing for ${Math.round(ms / 1000)} seconds`);
     } else {
         ms = length;
     }
@@ -216,11 +195,11 @@ function sleep(length) {
     });
 }
 
-async function merge(book, pageNumber, foreground_filename, background_filename) {
+async function merge(book, merger, pageNumber, foreground_filename, background_filename) {
     var title = book.title;
     var isbn = book.isbn;
     var pageSize = book.realSize;
-    logger.debug(`Merging page n. ${pageNumber}`);
+    logger.info(`Merging page n. ${pageNumber}`);
     const Puppeteer = require('puppeteer');
 
     const tmpDir = './tmp';
@@ -242,13 +221,6 @@ async function merge(book, pageNumber, foreground_filename, background_filename)
     } while (!background_exists);
 
     logger.debug(`Got everything for page n. ${pageNumber}`);
-    // while (!fs.existsSync(background_filename)) {
-    //     await sleep(500);
-    // }
-    
-    // while (!fs.existsSync(foreground_filename)) {
-    //     await sleep(500);
-    // }
 
     const background_content = fs.readFileSync(background_filename, {
         encoding: 'base64'
@@ -268,6 +240,7 @@ async function merge(book, pageNumber, foreground_filename, background_filename)
     const browser = await Puppeteer.launch();
     const page = await browser.newPage();
     await page.setContent(template);
+    logger.debug('Saving the page as PDF')
     await page.pdf({
         path: filePath,
         // format: "A4",
@@ -276,11 +249,13 @@ async function merge(book, pageNumber, foreground_filename, background_filename)
         printBackground: true
     });
 
+    logger.debug('Adding the page to the final PDF')
+    merger.add(filePath);
+
     await browser.close();
 };
 
 function printInfo(book) {
-    var px2mm = 2.83;
     console.log(`Title: ${book.title}`);
     console.log(`ISBN: ${book.isbn}`);
     console.log(`No. of pages: ${book.pages.length}`);

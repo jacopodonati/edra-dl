@@ -52,6 +52,7 @@ async function main() {
     program
         .version('1.0.0')
         .requiredOption('-i, --isbn [ISBN code]', 'ISBN del libro')
+        .option('-g, --get-info', 'Download and output book info')
         .option('-f, --full-speed', 'Don\'t wait between page downloads')
         .option('-t, --test-run', 'Download and merge the first 10 pages')
         .option('-d, --dry-run', 'Don\'t download any page')
@@ -69,10 +70,14 @@ async function main() {
     });
     // First of all, we get the info so we know how many pages are there.
     var book = await getInfo(isbn);
-    logger.debug('Starting file download');
-    // Then we download them all.
-    await getFiles(book);
-    logger.info('Done.');
+    if (!program.getInfo) {
+        logger.debug('Starting file download');
+        // Then we download them all.
+        await getFiles(book);
+        logger.info('Done.');
+    } else {
+        printInfo(book);
+    }
 }
 
 async function getInfo(isbn) {
@@ -108,6 +113,11 @@ async function getInfo(isbn) {
     logger.debug(`Scarico le pagine da ${book.sources.pages}`);
     var response = await fetch(book.sources.pages + book.sources.mock, options);
     var data = await response.json();
+    var px2mm = 2.83;
+    book.size = data.bookSize;
+    book.realSize = {}
+    book.realSize.width = Math.round(book.size.width / px2mm);
+    book.realSize.height = Math.round(book.size.height / px2mm);
     var pages = data.pages;
     // We delete uneeded content
     delete pages['defaults'];
@@ -185,7 +195,7 @@ async function getFiles(book) {
 
         var background = background_path;
         var foreground = book.pages[i].hasText ? foreground_path : false;
-        await merge(book.title, book.isbn, book.pages[i].number, foreground, background);
+        await merge(book, book.pages[i].number, foreground, background);
 
         if (!program.fullSpeed) {
             await sleep(false);
@@ -206,7 +216,10 @@ function sleep(length) {
     });
 }
 
-async function merge(title, isbn, pageNumber, foreground_filename, background_filename) {
+async function merge(book, pageNumber, foreground_filename, background_filename) {
+    var title = book.title;
+    var isbn = book.isbn;
+    var pageSize = book.realSize;
     logger.debug(`Merging page n. ${pageNumber}`);
     const Puppeteer = require('puppeteer');
 
@@ -257,9 +270,20 @@ async function merge(title, isbn, pageNumber, foreground_filename, background_fi
     await page.setContent(template);
     await page.pdf({
         path: filePath,
-        format: "A4",
+        // format: "A4",
+        width: `${pageSize.width}mm`,
+        height: `${pageSize.height}mm`,
         printBackground: true
     });
 
     await browser.close();
 };
+
+function printInfo(book) {
+    var px2mm = 2.83;
+    console.log(`Title: ${book.title}`);
+    console.log(`ISBN: ${book.isbn}`);
+    console.log(`No. of pages: ${book.pages.length}`);
+    console.log(`Page size (px): ${book.size.width}×${book.size.height}`);
+    console.log(`Estimated page size (mm): ${book.realSize.width}×${book.realSize.height}`)
+}

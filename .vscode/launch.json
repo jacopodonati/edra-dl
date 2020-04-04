@@ -14,7 +14,7 @@
             "outputCapture": "std",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821447167", "--verbose", "--test-run"]
+            "args": ["--isbn=9788821431166", "--verbose", "--test-run"]
         }
     ]
 }

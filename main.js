@@ -58,9 +58,9 @@ async function main() {
         await getFiles(book, merger);
         logger.info('Merging all pages into one');
         await merger.save(`${book.title}.pdf`);
-        var tmpRootDir = './tmp/';
-        logger.debug('Remove temporary files');
-        await fs.rmdir(tmpRootDir, {recursive: true});
+        // var tmpRootDir = './tmp/';
+        // logger.debug('Remove temporary files');
+        // await fs.rmdir(tmpRootDir, {recursive: true});
         logger.info('Done.');
     } else {
         printInfo(book);
@@ -96,8 +96,8 @@ async function getInfo(isbn) {
     var px2mm = 2.83;
     book.size = data.bookSize;
     book.realSize = {}
-    book.realSize.width = Math.round(book.size.width / px2mm);
-    book.realSize.height = Math.round(book.size.height / px2mm);
+    book.realSize.width = Math.ceil(book.size.width / px2mm);
+    book.realSize.height = Math.ceil(book.size.height / px2mm);
     var pages = data.pages;
     delete pages['defaults'];
     delete pages['structure'];

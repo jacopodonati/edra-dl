@@ -57,7 +57,8 @@ async function main() {
         var merger = new PDFMerger();
         await getFiles(book, merger);
         logger.info('Merging all pages into one');
-        await merger.save(`${book.title}.pdf`);
+        var outputDir = './pdf/';
+        await merger.save(outputDir + `${book.title}.pdf`);
         // var tmpRootDir = './tmp/';
         // logger.debug('Remove temporary files');
         // await fs.rmdir(tmpRootDir, {recursive: true});

@@ -58,7 +58,7 @@ async function main() {
         await getFiles(book, merger);
         logger.info('Merging all pages into one');
         var outputDir = './pdf/';
-        await merger.save(outputDir + `${book.title}.pdf`);
+        await merger.save(outputDir + `${Date.now()} - ${book.title}.pdf`);
         // var tmpRootDir = './tmp/';
         // logger.debug('Remove temporary files');
         // await fs.rmdir(tmpRootDir, {recursive: true});
@@ -145,8 +145,8 @@ async function getFiles(book, merger) {
         logger.info(`Downloading page no. ${book.pages[i].number} of ${lastPage}`);
         var foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
         var background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
-        var foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-foreground.svg`;
-        var background_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-background.jpg`;
+        var foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.svg`;
+        var background_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-bg.jpg`;
         var foreground_path = `${tmpDir}/${foreground_filename}`;
         var background_path = `${tmpDir}/${background_filename}`;
 
@@ -198,14 +198,13 @@ function sleep(length) {
 }
 
 async function merge(book, merger, pageNumber, foreground_filename, background_filename) {
-    var title = book.title;
     var isbn = book.isbn;
     var pageSize = book.realSize;
     logger.info(`Merging page n. ${pageNumber}`);
     const Puppeteer = require('puppeteer');
 
     const tmpDir = './tmp';
-    const filePath = `${tmpDir}/${isbn}/${title}_${pad(4, pageNumber, '0')}.pdf`;
+    const filePath = `${tmpDir}/${isbn}/${isbn}_${pad(4, pageNumber, '0')}.pdf`;
 
     do {
         logger.debug(`Waiting for the background of page n. ${pageNumber}...`);

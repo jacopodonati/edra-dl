@@ -65,6 +65,7 @@ async function main() {
     } else {
         printInfo(book);
     }
+    process.exit();
 }
 
 async function getInfo(isbn) {
@@ -243,9 +244,9 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
     logger.debug('Saving the page as PDF')
     await page.pdf({
         path: filePath,
-        // format: "A4",
         width: `${pageSize.width}mm`,
         height: `${pageSize.height}mm`,
+        pageRanges: '1',
         printBackground: true
     });
 

@@ -11,6 +11,7 @@ const program = new commander.Command();
 const fetch = require('node-fetch');
 const fs = require('fs');
 const pad = require('pad');
+const del = require('del');
 
 const logger = winston.createLogger({
     level: 'info',
@@ -36,8 +37,9 @@ async function main() {
         .requiredOption('-i, --isbn [ISBN code]', 'ISBN del libro')
         .option('-g, --get-info', 'Download and output book info')
         .option('-f, --full-speed', 'Don\'t wait between page downloads')
-        .option('-t, --test-run', 'Download and merge the first 10 pages')
+        .option('-t, --test-run', 'Download and merge the first 4 pages')
         .option('-d, --dry-run', 'Don\'t download any page')
+        .option('-p, --purge', 'Delete temporary files upon completion')
         .option('-v, --verbose', 'Show debug');
 
     program.parse(process.argv);
@@ -45,27 +47,53 @@ async function main() {
     var isbn = program.isbn;
     if (program.verbose) {
         logger.level = 'debug';
+        console.log(program.opts());
     }
 
     logger.info('Getting book info', {
         ISBN: isbn
     });
+
     var book = await getInfo(isbn);
+    printInfo(book);
+
     if (!program.getInfo) {
         logger.info('Starting file download');
+
         const PDFMerger = require('pdf-merger-js');
         var merger = new PDFMerger();
+
         await getFiles(book, merger);
+
         logger.info('Merging all pages into one');
         var outputDir = './pdf/';
-        await merger.save(outputDir + `${Date.now()} - ${book.title}.pdf`);
-        // var tmpRootDir = './tmp/';
-        // logger.debug('Remove temporary files');
-        // await fs.rmdir(tmpRootDir, {recursive: true});
-        logger.info('Done.');
-    } else {
-        printInfo(book);
+        if (!fs.existsSync(outputDir)) {
+            logger.debug(`Making ${outputDir}`);
+            fs.mkdirSync(outputDir);
+        }
+        var finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
+        logger.debug(`Saving the final PDF as: ${finalPdf}`);
+        await merger.save(finalPdf);
+
+        if (program.purge) {
+            var tmpRootDir = './tmp/';
+            var numberOfFolders = fs.readdirSync(tmpRootDir).length;
+            var delDir = tmpRootDir;
+            logger.info('Removing temporary files');
+            logger.debug(`There are ${numberOfFolders} file(s) inside ${delDir}`);
+            if (numberOfFolders > 1) {
+                logger.debug('I\'ll just delete this book temporary folder');
+                delDir = tmpRootDir + book.isbn;
+            }
+            try {
+                logger.debug(`Deleting ${delDir}`);
+                await del(delDir);
+            } catch (err) {
+                logger.error(`Error while deleting ${delDir}.`);
+            }
+        }
     }
+    logger.info('Done.');
     process.exit();
 }
 
@@ -123,7 +151,7 @@ async function getFiles(book, merger) {
     var tmpDir = tmpRootDir + book.isbn;
     var options = {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0'
         }
     };
 
@@ -138,7 +166,7 @@ async function getFiles(book, merger) {
 
     var lastPage = book.pages.length;
     if (program.testRun) {
-        lastPage = 10;
+        lastPage = 4;
     }
 
     for (var i = 0; i < lastPage; i++) {
@@ -178,7 +206,7 @@ async function getFiles(book, merger) {
 
         await merge(book, merger, book.pages[i].number, foreground, background);
 
-        if (!program.fullSpeed) {
+        if (!program.fullSpeed && (i != lastPage)) {
             await sleep(false);
         }
     }

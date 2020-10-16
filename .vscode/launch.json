@@ -39,6 +39,18 @@
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
             "args": ["--isbn=9788821431166", "--verbose", "--test-run", "--compile"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Scarica soltanto",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "outputCapture": "std",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}\\main.js",
+            "args": ["--isbn=9788821431166", "--verbose", "--test-run", "--download-only"]
         }
     ]
 }

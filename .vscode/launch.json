@@ -7,7 +7,7 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Avvia programma",
+            "name": "Download breve",
             "skipFiles": [
                 "<node_internals>/**"
             ],
@@ -15,6 +15,30 @@
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
             "args": ["--isbn=9788821431166", "--verbose", "--test-run"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Cancella dopo download completo",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "outputCapture": "std",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}\\main.js",
+            "args": ["--isbn=9788821431166", "--verbose", "--purge"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Compila",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "outputCapture": "std",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}\\main.js",
+            "args": ["--isbn=9788821431166", "--verbose", "--test-run", "--compile"]
         }
     ]
 }

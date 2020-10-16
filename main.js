@@ -30,49 +30,49 @@ main();
 async function main() {
     logger.debug('EDRA-dl');
 
-    logger.debug('Setting up Program');
+    logger.debug('Impostazione di Program');
 
     program
         .version('1.2.0')
-        .requiredOption('-i, --isbn [ISBN code]', 'ISBN del libro')
-        .option('-g, --get-info', 'Download and output book info')
-        .option('-f, --full-speed', 'Don\'t wait between page downloads')
-        .option('-t, --test-run', 'Download and merge the first 4 pages')
-        .option('-r, --dry-run', 'Don\'t download any page')
-        .option('-d, --download-only', 'Don\'t output a PDF after downloading a page')
-        .option('-p, --purge', 'Delete temporary files upon completion')
-        .option('-c, --compile', 'Output a PDF from previously downloaded pages')
-        .option('-v, --verbose', 'Show debug');
+        .requiredOption('-i, --isbn [codice ISBN]', 'ISBN del libro')
+        .option('-o, --ottieni-info', 'Scaricamento e stampa delle informazioni del libro')
+        .option('-b, --tutta-birra', 'Nesuna pausa tra gli scaricamenti')
+        .option('-t, --test', 'Scarica e produci un PDF delle prime quattro (4) pagine')
+        .option('-f, --fingi', 'Non scaricare nulla')
+        .option('-s, --scarica', 'Scarica le pagine, ma non produrre un PDF')
+        .option('-p, --pulisci', 'Pulisci la cartella temporane alla fine del processo')
+        .option('-c, --compila', 'Produci un PDF dalle pagine precedentemente scaricate')
+        .option('-v, --verboso', 'Mostra debug');
 
     program.parse(process.argv);
 
-    if ((program.dryRun && program.downloadOnly) || (program.compile && program.downloadOnly)) {
-        logger.error('Options are incompatible.');
+    if ((program.fingi && program.scarica) || (program.compila && program.scarica)) {
+        logger.error('Le opzioni non sono compatibili, pirla.');
         process.exit(1);
     }
 
     let isbn = program.isbn;
-    if (program.verbose) {
+    if (program.verboso) {
         logger.level = 'debug';
         console.log(program.opts());
     }
 
-    logger.info(`Getting info for ${isbn}`);
+    logger.info(`Cerco le informazioni per ${isbn}`);
     
     const tmpRootDir = './tmp/';
     if (!fs.existsSync(tmpRootDir)) {
-        logger.debug(`Making ${tmpRootDir}`);
+        logger.debug(`Creo ${tmpRootDir}`);
         fs.mkdirSync(tmpRootDir);
     }
     const tmpDir = tmpRootDir + isbn;
     if (!fs.existsSync(tmpDir)) {
-        logger.debug(`Making ${tmpDir}`);
+        logger.debug(`Creo ${tmpDir}`);
         fs.mkdirSync(tmpDir);
     }
 
     let book;
     const archived_json = `${tmpDir}/${isbn}.json`;
-    if (!program.compile || !fs.existsSync(archived_json)) {
+    if (!program.compila || !fs.existsSync(archived_json)) {
         book = await getInfo(isbn);
         fs.writeFileSync(archived_json, JSON.stringify(book))
     } else {
@@ -89,67 +89,67 @@ async function main() {
     const PDFMerger = require('pdf-merger-js');
     const merger = new PDFMerger();
 
-    if (program.compile) {
-        logger.info('Compiling the PDF from already downloaded files');
-        logger.debug(`Listing files for ${tmpDir}`);
+    if (program.compila) {
+        logger.info('Compila le pagine già scaricate in un nuovo PDF');
+        logger.debug(`Elenco i file in ${tmpDir}`);
         const path = require('path');
         const files = fs.readdirSync(tmpDir);
         const pdfs = files.filter(file => path.extname(file) === '.pdf');
         pdfs.forEach(pdf => {
-            logger.debug(`Deleting ${pdf}`);
+            logger.debug(`Elimino tutti i ${pdf}`);
             fs.unlinkSync(tmpDir + '/' + pdf);
         });
         const backgrounds = files.filter(file => path.extname(file) === '.jpg');
         backgrounds.forEach(bg => {
-            let paddedPageNumber = bg.substr(14, 4);
-            let pageNumber = parseInt(paddedPageNumber);
-            let background_filename = `${tmpDir}/${bg}`;
+            const paddedPageNumber = bg.substr(14, 4);
+            const pageNumber = parseInt(paddedPageNumber);
+            const background_filename = `${tmpDir}/${bg}`;
             let foreground_filename = `${tmpDir}/${book.isbn}-${paddedPageNumber}-fg.svg`;
-            logger.debug(`Background for page ${pageNumber} is ${background_filename}`);
-            logger.debug(`Foreground for page ${pageNumber} is ${foreground_filename}`);
+            logger.debug(`Lo sfondo per la pagina n. ${pageNumber} è: ${background_filename}`);
+            logger.debug(`Il testo per la pagina n. ${pageNumber} è: ${foreground_filename}`);
             if (!fs.existsSync(foreground_filename)) {
-                logger.debug('Foreground does not exist');
+                logger.debug('Questa pagina non ha testo');
                 foreground_filename = false;
             }
             merge(book, merger, pageNumber, foreground_filename, background_filename);
         });
         
-        let finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
-        logger.debug(`Saving the final PDF as: ${finalPdf}`);
+        const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
+        logger.debug(`Salvo il PDF finale come: ${finalPdf}`);
         await merger.save(finalPdf);
     } else {
-        logger.info('Starting file download');
+        logger.info('Inizio lo scaricamento dei file');
         await getFiles(book, merger);
 
-        if (!program.downloadOnly) {
-            logger.info('Merging all pages into one');
+        if (!program.scarica) {
+            logger.info('Unisco tutte le pagine in una sola');
             if (!fs.existsSync(outputDir)) {
-                logger.debug(`Making ${outputDir}`);
+                logger.debug(`Creo ${outputDir}`);
                 fs.mkdirSync(outputDir);
             }
-            let finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
-            logger.debug(`Saving the final PDF as: ${finalPdf}`);
+            const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
+            logger.debug(`Salvo il PDF finale ocme: ${finalPdf}`);
             await merger.save(finalPdf);
         }
 
-        if (program.purge) {
-            var numberOfFolders = fs.readdirSync(tmpRootDir).length;
-            var delDir = tmpRootDir;
-            logger.info('Removing temporary files');
-            logger.debug(`There are ${numberOfFolders} file(s) inside ${delDir}`);
+        if (program.pulisci) {
+            const numberOfFolders = fs.readdirSync(tmpRootDir).length;
+            const delDir = tmpRootDir;
+            logger.info('Elimino i file temporanei');
+            logger.debug(`Ci sono ${numberOfFolders} file dentro ${delDir}`);
             if (numberOfFolders > 1) {
-                logger.debug('I\'ll just delete this book temporary folder');
+                logger.debug(`Cancellerò solamente la cartella dedicata a ${book.isbn}`);
                 delDir = tmpRootDir + book.isbn;
             }
             try {
-                logger.debug(`Deleting ${delDir}`);
+                logger.debug(`Elimino ${delDir}`);
                 await del(delDir);
             } catch (err) {
-                logger.error(`Error while deleting ${delDir}.`);
+                logger.error(`C'è stato un errore nell'eliminazione di ${delDir}.`);
             }
         }
     }
-    logger.info('Done.');
+    logger.info('Fatto. ;)');
     process.exit();
 }
 
@@ -171,12 +171,12 @@ async function getInfo(isbn) {
         }
     };
 
-    logger.debug(`Downloading TOC from ${book.sources.toc}`);
+    logger.debug(`Scaricamento TOC da ${book.sources.toc}`);
     let response = await fetch(book.sources.toc + book.sources.mock, options);
     let data = await response.json();
     book.title = data.title;
 
-    logger.debug(`Downloading page list from ${book.sources.pages}`);
+    logger.debug(`Scaricamento della lista delle pagine da ${book.sources.pages}`);
     response = await fetch(book.sources.pages + book.sources.mock, options);
     data = await response.json();
     const px2mm = 2.83;
@@ -212,10 +212,10 @@ async function getFiles(book, merger) {
         }
     };
 
-    const lastPage = program.testRun ? 4 : book.pages.length;
+    const lastPage = program.test ? 4 : book.pages.length;
 
     for (let i = 0; i < lastPage; i++) {
-        logger.info(`Downloading page no. ${book.pages[i].number} of ${lastPage}`);
+        logger.info(`Scarico la pagina n. ${book.pages[i].number} di ${lastPage}`);
         const foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
         const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
         const foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.svg`;
@@ -223,7 +223,7 @@ async function getFiles(book, merger) {
         const foreground_path = `${tmpDir}/${foreground_filename}`;
         const background_path = `${tmpDir}/${background_filename}`;
 
-        logger.debug('Downloading the background');
+        logger.debug('Scarico lo sfondo');
         if (!program.dryRun) {
             await fetch(background_url + book.sources.mock, options)
                 .then(res => {
@@ -233,7 +233,7 @@ async function getFiles(book, merger) {
         }
 
         if (book.pages[i].hasText) {
-            logger.debug('Downloading the text');
+            logger.debug('Scarico il testo');
             await fetch(foreground_url + book.sources.mock, options)
                 .then(res => res.text())
                 .then(body => {
@@ -243,28 +243,28 @@ async function getFiles(book, merger) {
                 })
                 .catch(err => console.log(err));
         } else {
-            logger.debug(`Page no. ${book.pages[i].number} has no text`);
+            logger.debug(`La pagina n. ${book.pages[i].number} non ha testo`);
         }
 
-        if (!program.downloadOnly) {
+        if (!program.scarica) {
             const background = background_path;
             const foreground = book.pages[i].hasText ? foreground_path : false;
             await merge(book, merger, book.pages[i].number, foreground, background);
         }
 
-        if (!program.fullSpeed && (i != (lastPage - 1))) {
-            await sleep(false);
+        if (!program.tuttaBirra && (i != (lastPage - 1))) {
+            await pausa(false);
         }
     }
 }
 
-function sleep(length) {
-    var ms;
-    if (length === false) {
+function pausa(durata) {
+    let ms;
+    if (durata === false) {
         ms = Math.random() * (8000 - 2000) + 2000;
-        logger.info(`Pausing for ${Math.round(ms / 1000)} seconds`);
+        logger.info(`Resto in attesa per ${Math.round(ms / 1000)} secondi`);
     } else {
-        ms = length;
+        ms = durata;
     }
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
@@ -274,31 +274,31 @@ function sleep(length) {
 async function merge(book, merger, pageNumber, foreground_filename, background_filename) {
     const isbn = book.isbn;
     const pageSize = book.realSize;
-    logger.info(`Merging page n. ${pageNumber}`);
+    logger.info(`Produco la pagina n. ${pageNumber}`);
     const Puppeteer = require('puppeteer');
 
     const tmpDir = './tmp';
     const filePath = `${tmpDir}/${isbn}/${isbn}_${pad(4, pageNumber, '0')}.pdf`;
 
-    logger.debug('Looking for the files')
+    logger.debug('Cerco i file')
     do {
-        logger.debug(`Waiting for the background of page n. ${pageNumber}...`);
+        logger.debug(`In attesa dello sfondo per la pagina n. ${pageNumber}...`);
         await sleep(500);
         var background_exists = fs.existsSync(background_filename);
         do {
             var foreground_exists = false;
             if (foreground_filename === false) {
-                logger.debug(`Page n. ${pageNumber} has no foreground.`);
+                logger.debug(`La pagina n. ${pageNumber} non ha testo.`);
                 break;
             } else {
-                logger.debug(`Waiting for the foreground of page n. ${pageNumber}...`);
+                logger.debug(`In attesa del testo per la pagina n. ${pageNumber}...`);
                 await sleep(500);
                 foreground_exists = fs.existsSync(foreground_filename);
             }
         } while (!foreground_exists); 
     } while (!background_exists);
 
-    logger.debug(`Got everything for page n. ${pageNumber}`);
+    logger.debug(`Ho tutto per la pagina n. ${pageNumber}`);
 
     const background_content = fs.readFileSync(background_filename, {
         encoding: 'base64'
@@ -318,7 +318,7 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
     const browser = await Puppeteer.launch();
     const page = await browser.newPage();
     await page.setContent(template);
-    logger.debug('Saving the page as PDF')
+    logger.debug('Stampo la pagina come PDF')
     await page.pdf({
         path: filePath,
         width: `${pageSize.width}mm`,
@@ -327,16 +327,16 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
         printBackground: true
     });
 
-    logger.debug('Adding the page to the final PDF')
+    logger.debug('Aggiungo la pagina al PDF finale')
     merger.add(filePath);
 
     await browser.close();
 };
 
 function printInfo(book) {
-    console.log(`Title: ${book.title}`);
+    console.log(`Titolo: ${book.title}`);
     console.log(`ISBN: ${book.isbn}`);
-    console.log(`No. of pages: ${book.pages.length}`);
-    console.log(`Page size (px): ${book.size.width}×${book.size.height}`);
-    console.log(`Estimated page size (mm): ${book.realSize.width}×${book.realSize.height}`)
+    console.log(`Numero di pagine: ${book.pages.length}`);
+    console.log(`Dimensione della pagina (px): ${book.size.width}×${book.size.height}`);
+    console.log(`Stima delle dimensioni reali (mm): ${book.realSize.width}×${book.realSize.height}`)
 }

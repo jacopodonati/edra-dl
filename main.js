@@ -34,25 +34,25 @@ async function main() {
 
     program
         .version('1.2.0')
-        .requiredOption('-i, --isbn [codice ISBN]', 'ISBN del libro')
-        .option('-o, --ottieni-info', 'Scaricamento e stampa delle informazioni del libro')
-        .option('-b, --tutta-birra', 'Nesuna pausa tra gli scaricamenti')
-        .option('-t, --test', 'Scarica e produci un PDF delle prime quattro (4) pagine')
-        .option('-f, --fingi', 'Non scaricare nulla')
-        .option('-s, --scarica', 'Scarica le pagine, ma non produrre un PDF')
-        .option('-p, --pulisci', 'Pulisci la cartella temporane alla fine del processo')
-        .option('-c, --compila', 'Produci un PDF dalle pagine precedentemente scaricate')
-        .option('-v, --verboso', 'Mostra debug');
+        .requiredOption('-i, --isbn [ISBN code]', 'ISBN code for the beook')
+        .option('-I, --get-info', 'Downloads and prints book info')
+        .option('-f, --full-speed', 'Don\'t wait between pages')
+        .option('-t, --test', 'Download and compile the first four pages')
+        .option('-d, --dry-run', 'Ain\'t download nothin\'')
+        .option('-D, --download', 'Downloads without PDF output')
+        .option('-p, --purge', 'Purge temporary files after download')
+        .option('-c, --compile', 'Output a PDF from previously downloaded pages')
+        .option('-v, --verbose', 'Show debug');
 
     program.parse(process.argv);
 
-    if ((program.fingi && program.scarica) || (program.compila && program.scarica)) {
+    if ((program.dryRun && program.download) || (program.compile && program.download)) {
         logger.error('Le opzioni non sono compatibili, pirla.');
         process.exit(1);
     }
 
     let isbn = program.isbn;
-    if (program.verboso) {
+    if (program.verbose) {
         logger.level = 'debug';
         console.log(program.opts());
     }
@@ -72,7 +72,7 @@ async function main() {
 
     let book;
     const archived_json = `${tmpDir}/${isbn}.json`;
-    if (!program.compila || !fs.existsSync(archived_json)) {
+    if (!program.compile || !fs.existsSync(archived_json)) {
         book = await getInfo(isbn);
         fs.writeFileSync(archived_json, JSON.stringify(book))
     } else {
@@ -89,7 +89,7 @@ async function main() {
     const PDFMerger = require('pdf-merger-js');
     const merger = new PDFMerger();
 
-    if (program.compila) {
+    if (program.compile) {
         logger.info('Compila le pagine già scaricate in un nuovo PDF');
         logger.debug(`Elenco i file in ${tmpDir}`);
         const path = require('path');
@@ -121,7 +121,7 @@ async function main() {
         logger.info('Inizio lo scaricamento dei file');
         await getFiles(book, merger);
 
-        if (!program.scarica) {
+        if (!program.download) {
             logger.info('Unisco tutte le pagine in una sola');
             if (!fs.existsSync(outputDir)) {
                 logger.debug(`Creo ${outputDir}`);
@@ -132,7 +132,7 @@ async function main() {
             await merger.save(finalPdf);
         }
 
-        if (program.pulisci) {
+        if (program.purge) {
             const numberOfFolders = fs.readdirSync(tmpRootDir).length;
             const delDir = tmpRootDir;
             logger.info('Elimino i file temporanei');
@@ -167,7 +167,8 @@ async function getInfo(isbn) {
     const options = {
         headers: {
             'Content-Type': 'application/javascript',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0',
+            // 'Cookie': 'edravet19=e9h58tgc31qren6v7liiq2kd35; visid_incap_2169009=uJtcYxYmTlW4OYtoGD0GBusclF8AAAAAQUIPAAAAAABwtZcTXtFInMP+OXiSQLxL; incap_ses_477_2169009=q9zYdwH2+hq94dM9M6WeBusclF8AAAAAtkWcP6NNCeMbdmO/gkyBgQ==; cc_cookie_decline=null; cc_cookie_accept=cc_cookie_accept'
         }
     };
 
@@ -246,13 +247,13 @@ async function getFiles(book, merger) {
             logger.debug(`La pagina n. ${book.pages[i].number} non ha testo`);
         }
 
-        if (!program.scarica) {
+        if (!program.download) {
             const background = background_path;
             const foreground = book.pages[i].hasText ? foreground_path : false;
             await merge(book, merger, book.pages[i].number, foreground, background);
         }
 
-        if (!program.tuttaBirra && (i != (lastPage - 1))) {
+        if (!program.fullSpeed && (i != (lastPage - 1))) {
             await pausa(false);
         }
     }
@@ -283,7 +284,7 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
     logger.debug('Cerco i file')
     do {
         logger.debug(`In attesa dello sfondo per la pagina n. ${pageNumber}...`);
-        await sleep(500);
+        await pausa(500);
         var background_exists = fs.existsSync(background_filename);
         do {
             var foreground_exists = false;
@@ -292,7 +293,7 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
                 break;
             } else {
                 logger.debug(`In attesa del testo per la pagina n. ${pageNumber}...`);
-                await sleep(500);
+                await pausa(500);
                 foreground_exists = fs.existsSync(foreground_filename);
             }
         } while (!foreground_exists); 

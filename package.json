@@ -17,13 +17,13 @@
   },
   "homepage": "https://github.com/jacopodonati/edra-dl#readme",
   "dependencies": {
-    "commander": "^6.1.0",
+    "commander": "^6.2.0",
     "del": "^6.0.0",
     "fs": "0.0.1-security",
     "node-fetch": "^2.6.1",
     "pad": "^3.2.0",
     "pdf-merger-js": "^3.0.5",
-    "puppeteer": "^5.3.1",
+    "puppeteer": "^5.4.1",
     "winston": "^3.3.3"
   }
 }

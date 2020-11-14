@@ -5,6 +5,8 @@
 
 "use strict";
 
+process.binding('http_parser').HTTPParser = require('http-parser-js').HTTPParser;
+
 const winston = require('winston')
 const commander = require('commander');
 const program = new commander.Command();

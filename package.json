@@ -20,6 +20,7 @@
     "commander": "^6.2.0",
     "del": "^6.0.0",
     "fs": "0.0.1-security",
+    "http-parser-js": "^0.5.2",
     "node-fetch": "^2.6.1",
     "pad": "^3.2.0",
     "pdf-merger-js": "^3.0.5",

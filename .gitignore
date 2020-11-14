@@ -1,4 +1,5 @@
 node_modules/
 tmp/
 pdf/
-login_data.txt
+.res/
+.vscode/

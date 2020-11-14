@@ -14,7 +14,7 @@
             "outputCapture": "std",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821431166", "--verboso", "--test"]
+            "args": ["--isbn=9788821448416", "--verbose", "--test"]
         },
         {
             "type": "node",
@@ -26,7 +26,7 @@
             "outputCapture": "std",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821431166", "--verboso", "--pulisci"]
+            "args": ["--isbn=9788821431166", "--verbose", "--pulisci"]
         },
         {
             "type": "node",
@@ -38,7 +38,7 @@
             "outputCapture": "std",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821431166", "--verboso", "--test", "--compila"]
+            "args": ["--isbn=9788821431166", "--verbose", "--test", "--compila"]
         },
         {
             "type": "node",
@@ -50,7 +50,7 @@
             "outputCapture": "std",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}\\main.js",
-            "args": ["--isbn=9788821431166", "--verboso", "--test", "--scarica"]
+            "args": ["--isbn=9788821431166", "--verbose", "--test", "--scarica"]
         }
     ]
 }

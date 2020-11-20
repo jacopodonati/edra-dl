@@ -6,6 +6,7 @@
 "use strict";
 
 process.binding('http_parser').HTTPParser = require('http-parser-js').HTTPParser;
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const winston = require('winston')
 const commander = require('commander');
@@ -44,6 +45,7 @@ async function main() {
         .option('-D, --download', 'Downloads without PDF output')
         .option('-p, --purge', 'Purge temporary files after download')
         .option('-c, --compile', 'Output a PDF from previously downloaded pages')
+        .option('-s, --single', 'Output a PDF for each page')
         .option('-v, --verbose', 'Show debug');
 
     program.parse(process.argv);
@@ -377,8 +379,10 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
         printBackground: true
     });
 
-    logger.debug('Adding the page to the final PDF')
-    merger.add(filePath);
+    if (!program.single) {
+        logger.debug('Adding the page to the final PDF')
+        merger.add(filePath);
+    }
 
     await browser.close();
 };

@@ -32,10 +32,10 @@ main();
 async function main() {
     logger.debug('EDRA-dl');
 
-    logger.debug('Impostazione di Program');
+    logger.debug('Setting up di Program');
 
     program
-        .version('1.2.0')
+        .version('1.3.0')
         .requiredOption('-i, --isbn [ISBN code]', 'ISBN code for the beook')
         .option('-I, --get-info', 'Downloads and prints book info')
         .option('-f, --full-speed', 'Don\'t wait between pages')
@@ -49,7 +49,7 @@ async function main() {
     program.parse(process.argv);
 
     if ((program.dryRun && program.download) || (program.compile && program.download)) {
-        logger.error('Le opzioni non sono compatibili, pirla.');
+        logger.error('Options are incompatible, dummy.');
         process.exit(1);
     }
 
@@ -59,16 +59,16 @@ async function main() {
         console.log(program.opts());
     }
 
-    logger.info(`Cerco le informazioni per ${isbn}`);
+    logger.info(`Looking for ${isbn} info`);
     
     const tmpRootDir = './tmp/';
     if (!fs.existsSync(tmpRootDir)) {
-        logger.debug(`Creo ${tmpRootDir}`);
+        logger.debug(`Making ${tmpRootDir}`);
         fs.mkdirSync(tmpRootDir);
     }
     const tmpDir = tmpRootDir + isbn;
     if (!fs.existsSync(tmpDir)) {
-        logger.debug(`Creo ${tmpDir}`);
+        logger.debug(`Making ${tmpDir}`);
         fs.mkdirSync(tmpDir);
     }
 
@@ -151,7 +151,7 @@ async function main() {
             }
         }
     }
-    logger.info('Fatto. ;)');
+    logger.info('Done. ;)');
     process.exit();
 }
 
@@ -174,12 +174,12 @@ async function getInfo(isbn) {
         }
     };
 
-    logger.debug(`Scaricamento TOC da ${book.sources.toc}`);
-    let response = await fetch(book.sources.toc + book.sources.mock, options);
+    logger.debug(`Downloading TOC from ${book.sources.toc}`);
+    let response = await fetch(book.sources.toc, options);
     let data = await response.json();
     book.title = data.title;
 
-    logger.debug(`Scaricamento della lista delle pagine da ${book.sources.pages}`);
+    logger.debug(`Downloading page list from ${book.sources.pages}`);
     response = await fetch(book.sources.pages + book.sources.mock, options);
     data = await response.json();
     const px2mm = 2.83;
@@ -188,18 +188,26 @@ async function getInfo(isbn) {
     book.realSize.width = Math.ceil(book.size.width / px2mm);
     book.realSize.height = Math.ceil(book.size.height / px2mm);
     let pages = data.pages;
-    delete pages['defaults'];
+    // delete pages['defaults'];
     delete pages['structure'];
     book.pages = []
     for (let number in pages) {
-        let hasText = false;
+        let hasText = data.pages.defaults.textLayer;
+        let isVector = data.pages.defaults.vectorText;
+
         if (pages[number].hasOwnProperty('textLayer')) {
-            hasText = true;
+            hasText = pages[number].textLayer;
         }
+        if (pages[number].hasOwnProperty('vectorText')) {
+            isVector = pages[number].vectorText;
+        }
+
         let page = {
             'number': number,
-            'hasText': hasText
+            'hasText': hasText,
+            'isVector': isVector
         }
+
         book.pages.push(page);
     }
 
@@ -215,20 +223,33 @@ async function getFiles(book, merger) {
         }
     };
 
-    const lastPage = program.test ? 4 : book.pages.length;
+    const lastPage = program.test ? 10 : book.pages.length;
 
     for (let i = 0; i < lastPage; i++) {
-        logger.info(`Scarico la pagina n. ${book.pages[i].number} di ${lastPage}`);
-        const foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
-        const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
-        const foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.svg`;
+        logger.info(`Downloading page no. ${book.pages[i].number} di ${lastPage}`);
+
+        let foreground_url;
+        let background_url;
+        let foreground_filename;
+        
+        if (book.pages[i].isVector) {
+            foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
+            background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
+            foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.svg`;
+        } else {
+            foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-textlayers/page${pad(4, book.pages[i].number, '0')}_l1.png`;
+            background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_l.jpg`;
+            foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.png`;
+        }
+        
         const background_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-bg.jpg`;
         const foreground_path = `${tmpDir}/${foreground_filename}`;
         const background_path = `${tmpDir}/${background_filename}`;
-
-        logger.debug('Scarico lo sfondo');
+        
+        logger.debug('Downloading the background layer');
         if (!program.dryRun) {
-            await fetch(background_url + book.sources.mock, options)
+            logger.debug(`Background URL is: ${background_url}`);
+            await fetch(background_url, options)
                 .then(res => {
                     const dest = fs.createWriteStream(background_path);
                     res.body.pipe(dest);
@@ -236,17 +257,28 @@ async function getFiles(book, merger) {
         }
 
         if (book.pages[i].hasText) {
-            logger.debug('Scarico il testo');
-            await fetch(foreground_url + book.sources.mock, options)
-                .then(res => res.text())
-                .then(body => {
-                    const dest = fs.writeFile(foreground_path, body, (err) => {
-                        if (err) throw err;
-                    });
-                })
-                .catch(err => console.log(err));
+            logger.debug('Downloading the foreground layer');
+            logger.debug(`Foreground URL is: ${foreground_url}`);
+            if (book.pages[i].isVector) {
+                logger.debug('Foreground is vectorial.');
+                await fetch(foreground_url, options)
+                    .then(res => res.text())
+                    .then(body => {
+                        const dest = fs.writeFile(foreground_path, body, (err) => {
+                            if (err) throw err;
+                        });
+                    })
+                    .catch(err => console.log(err));
+            } else {
+                logger.debug('Foreground is raster.');
+                await fetch(foreground_url, options)
+                .then(res => {
+                    const dest = fs.createWriteStream(foreground_path);
+                    res.body.pipe(dest);
+                });
+            }
         } else {
-            logger.debug(`La pagina n. ${book.pages[i].number} non ha testo`);
+            logger.debug(`Page no. ${book.pages[i].number} has no foreground layer`);
         }
 
         if (!program.download) {
@@ -256,18 +288,18 @@ async function getFiles(book, merger) {
         }
 
         if (!program.fullSpeed && (i != (lastPage - 1))) {
-            await pausa(false);
+            await pause(false);
         }
     }
 }
 
-function pausa(durata) {
+function pause(length) {
     let ms;
-    if (durata === false) {
+    if (length === false) {
         ms = Math.random() * (8000 - 2000) + 2000;
-        logger.info(`Resto in attesa per ${Math.round(ms / 1000)} secondi`);
+        logger.info(`Waiting for ${Math.round(ms / 1000)} seconds`);
     } else {
-        ms = durata;
+        ms = length;
     }
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
@@ -277,51 +309,66 @@ function pausa(durata) {
 async function merge(book, merger, pageNumber, foreground_filename, background_filename) {
     const isbn = book.isbn;
     const pageSize = book.realSize;
-    logger.info(`Produco la pagina n. ${pageNumber}`);
+    logger.info(`Compiling page no. ${pageNumber}`);
     const Puppeteer = require('puppeteer');
 
     const tmpDir = './tmp';
     const filePath = `${tmpDir}/${isbn}/${isbn}_${pad(4, pageNumber, '0')}.pdf`;
 
-    logger.debug('Cerco i file')
+    logger.debug('Looking for the files')
     do {
-        logger.debug(`In attesa dello sfondo per la pagina n. ${pageNumber}...`);
-        await pausa(500);
+        logger.debug(`Waiting for page no. ${pageNumber} background layer...`);
+        await pause(500);
         var background_exists = fs.existsSync(background_filename);
         do {
             var foreground_exists = false;
             if (foreground_filename === false) {
-                logger.debug(`La pagina n. ${pageNumber} non ha testo.`);
+                logger.debug(`Page no. ${pageNumber} has no foreground layer.`);
                 break;
             } else {
-                logger.debug(`In attesa del testo per la pagina n. ${pageNumber}...`);
-                await pausa(500);
+                logger.debug(`Waiting for page no. ${pageNumber} foreground layer...`);
+                await pause(500);
                 foreground_exists = fs.existsSync(foreground_filename);
             }
         } while (!foreground_exists); 
     } while (!background_exists);
 
-    logger.debug(`Ho tutto per la pagina n. ${pageNumber}`);
+    logger.debug(`Got everything for page no. ${pageNumber}`);
 
-    const background_content = fs.readFileSync(background_filename, {
-        encoding: 'base64'
-    });
+    let background_content;
     let foreground_content;
-    if (foreground_filename !== false) {
-        foreground_content = fs.readFileSync(foreground_filename, {
+    let template;
+
+    if (book.pages[pageNumber].isVector) {
+        background_content = fs.readFileSync(background_filename, {
             encoding: 'base64'
         });
+        if (foreground_filename !== false) {
+            foreground_content = fs.readFileSync(foreground_filename, {
+                encoding: 'base64'
+            });
+        } else {
+            foreground_content = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1IDUiIGZpbGwtcnVsZT0iZXZlbm9kZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW1pdGVybGltaXQ9IjIiLz4=';
+        }
+        template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%"></div></body></html>`;
     } else {
-        foreground_content = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1IDUiIGZpbGwtcnVsZT0iZXZlbm9kZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW1pdGVybGltaXQ9IjIiLz4=';
+        background_content = fs.readFileSync(background_filename, {
+            encoding: 'base64'
+        });
+        if (foreground_filename !== false) {
+            foreground_content = fs.readFileSync(foreground_filename, {
+                encoding: 'base64'
+            });
+        } else {
+            foreground_content = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
+        }
+        template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;"><img src="data:image/png;base64,${foreground_content}" style="width:100%"></div></body></html>`;
     }
-
-    const template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%"></div></body></html>`;
-    // const template = `<html><body style="margin:0"><div style="width:100%;height:100%;background:url(data:image/svg+xml;base64,${foreground_content}),url(data:image/jpg;base64,${background_content});background-size:100%,100%"></div></body></html>`;
 
     const browser = await Puppeteer.launch();
     const page = await browser.newPage();
     await page.setContent(template);
-    logger.debug('Stampo la pagina come PDF')
+    logger.debug('Printing the page as PDF')
     await page.pdf({
         path: filePath,
         width: `${pageSize.width}mm`,
@@ -330,16 +377,16 @@ async function merge(book, merger, pageNumber, foreground_filename, background_f
         printBackground: true
     });
 
-    logger.debug('Aggiungo la pagina al PDF finale')
+    logger.debug('Adding the page to the final PDF')
     merger.add(filePath);
 
     await browser.close();
 };
 
 function printInfo(book) {
-    console.log(`Titolo: ${book.title}`);
+    console.log(`Title: ${book.title}`);
     console.log(`ISBN: ${book.isbn}`);
-    console.log(`Numero di pagine: ${book.pages.length}`);
-    console.log(`Dimensione della pagina (px): ${book.size.width}×${book.size.height}`);
-    console.log(`Stima delle dimensioni reali (mm): ${book.realSize.width}×${book.realSize.height}`)
+    console.log(`Number of pages: ${book.pages.length}`);
+    console.log(`Page size in pixels: ${book.size.width}×${book.size.height}`);
+    console.log(`Estimated page size in millimetres: ${book.realSize.width}×${book.realSize.height}`)
 }

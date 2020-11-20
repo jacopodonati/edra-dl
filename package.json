@@ -24,7 +24,7 @@
     "node-fetch": "^2.6.1",
     "pad": "^3.2.0",
     "pdf-merger-js": "^3.0.5",
-    "puppeteer": "^5.4.1",
+    "puppeteer": "^5.5.0",
     "winston": "^3.3.3"
   }
 }

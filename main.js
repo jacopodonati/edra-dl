@@ -43,6 +43,7 @@ async function main() {
         .option('-t, --test', 'Download and compile the first four pages')
         .option('-d, --dry-run', 'Ain\'t download nothin\'')
         .option('-D, --download', 'Downloads without PDF output')
+        .option('-r, --range <range>', 'Download selected range.  Range is formatted as "start-end" (e.g. 21-34).  "start-" and "-end" is also accepted.')
         .option('-p, --purge', 'Purge temporary files after download')
         .option('-c, --compile', 'Output a PDF from previously downloaded pages')
         .option('-s, --single', 'Output a PDF for each page')
@@ -76,6 +77,8 @@ async function main() {
 
     let book;
     const archived_json = `${tmpDir}/${isbn}.json`;
+
+    
     if (!program.compile || !fs.existsSync(archived_json)) {
         book = await getInfo(isbn);
         fs.writeFileSync(archived_json, JSON.stringify(book))
@@ -84,6 +87,32 @@ async function main() {
         book = JSON.parse(saved_info);
     }
     printInfo(book);
+    
+    book.downloadFrom = 1;
+    book.downloadTo = book.pages.length;
+
+    if (program.range) {
+        logger.debug(`Parsing ${program.range} as range`);
+        let strings = program.range.split('-');
+        if (strings.length != 2) {
+            logger.error(`${program.range} is not a valid range`);
+            process.exit(-1);
+        } else {
+            if (!isNaN(strings[0]) && parseInt(strings[0]) > 0) {
+                book.downloadFrom = parseInt(strings[0]);
+                logger.debug('First page to download is page no. ' + book.downloadFrom);
+            }
+            if (!isNaN(strings[1]) && parseInt(strings[1]) <= book.downloadTo) {
+                book.downloadTo = parseInt(strings[1]);
+                logger.debug('Last page to download is page no. ' + book.downloadTo);
+            }
+        }
+    }
+
+    if (program.test) {
+        book.downloadFrom = 1;
+        book.downloadTo = 10;
+    }
 
     if (program.getInfo) {
         process.exit();
@@ -94,13 +123,13 @@ async function main() {
     const merger = new PDFMerger();
 
     if (program.compile) {
-        logger.info('Compila le pagine già scaricate in un nuovo PDF');
-        logger.debug(`Elenco i file in ${tmpDir}`);
+        logger.info('Compiling already downloaded pages');
+        logger.debug(`Listing files in ${tmpDir}`);
         const path = require('path');
         const files = fs.readdirSync(tmpDir);
         const pdfs = files.filter(file => path.extname(file) === '.pdf');
         pdfs.forEach(pdf => {
-            logger.debug(`Elimino tutti i ${pdf}`);
+            logger.debug(`Deleting all ${pdf}`);
             fs.unlinkSync(tmpDir + '/' + pdf);
         });
         const backgrounds = files.filter(file => path.extname(file) === '.jpg');
@@ -119,37 +148,37 @@ async function main() {
         });
         
         const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
-        logger.debug(`Salvo il PDF finale come: ${finalPdf}`);
+        logger.debug(`Saving the final PDF as ${finalPdf}`);
         await merger.save(finalPdf);
     } else {
-        logger.info('Inizio lo scaricamento dei file');
+        logger.info('Downloading');
         await getFiles(book, merger);
 
-        if (!program.download) {
-            logger.info('Unisco tutte le pagine in una sola');
+        if (!program.download || !program.single) {
+            logger.info('Merging all pages into one');
             if (!fs.existsSync(outputDir)) {
-                logger.debug(`Creo ${outputDir}`);
+                logger.debug(`Making ${outputDir}`);
                 fs.mkdirSync(outputDir);
             }
             const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
-            logger.debug(`Salvo il PDF finale ocme: ${finalPdf}`);
+            logger.debug(`Saving the final PDF as: ${finalPdf}`);
             await merger.save(finalPdf);
         }
 
         if (program.purge) {
             const numberOfFolders = fs.readdirSync(tmpRootDir).length;
             const delDir = tmpRootDir;
-            logger.info('Elimino i file temporanei');
-            logger.debug(`Ci sono ${numberOfFolders} file dentro ${delDir}`);
+            logger.info('Deleting all temporary files');
+            logger.debug(`There are ${numberOfFolders} files inside ${delDir}`);
             if (numberOfFolders > 1) {
-                logger.debug(`Cancellerò solamente la cartella dedicata a ${book.isbn}`);
+                logger.debug(`I'll delete the files regarding ${book.isbn}`);
                 delDir = tmpRootDir + book.isbn;
             }
             try {
-                logger.debug(`Elimino ${delDir}`);
+                logger.debug(`Deleting ${delDir}`);
                 await del(delDir);
             } catch (err) {
-                logger.error(`C'è stato un errore nell'eliminazione di ${delDir}.`);
+                logger.error(`There was an errore while deleting ${delDir}.`);
             }
         }
     }
@@ -171,8 +200,7 @@ async function getInfo(isbn) {
     const options = {
         headers: {
             'Content-Type': 'application/javascript',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0',
-            // 'Cookie': 'edravet19=e9h58tgc31qren6v7liiq2kd35; visid_incap_2169009=uJtcYxYmTlW4OYtoGD0GBusclF8AAAAAQUIPAAAAAABwtZcTXtFInMP+OXiSQLxL; incap_ses_477_2169009=q9zYdwH2+hq94dM9M6WeBusclF8AAAAAtkWcP6NNCeMbdmO/gkyBgQ==; cc_cookie_decline=null; cc_cookie_accept=cc_cookie_accept'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:73.0) Gecko/20100101 Firefox/73.0'
         }
     };
 
@@ -225,10 +253,10 @@ async function getFiles(book, merger) {
         }
     };
 
-    const lastPage = program.test ? 10 : book.pages.length;
+    logger.info(`Downloading ${book.isbn} from page no. ${book.downloadFrom} to page no. ${book.downloadTo}`);
 
-    for (let i = 0; i < lastPage; i++) {
-        logger.info(`Downloading page no. ${book.pages[i].number} di ${lastPage}`);
+    for (let i = book.downloadFrom - 1; i < book.downloadTo; i++) {
+        logger.info(`Downloading page no. ${book.pages[i].number} di ${book.downloadTo}`);
 
         let foreground_url;
         let background_url;
@@ -289,7 +317,7 @@ async function getFiles(book, merger) {
             await merge(book, merger, book.pages[i].number, foreground, background);
         }
 
-        if (!program.fullSpeed && (i != (lastPage - 1))) {
+        if (!program.fullSpeed && !(i % 2) && (i != (book.downloadTo - 1))) {
             await pause(false);
         }
     }

@@ -99,32 +99,7 @@ async function main() {
         }
     }
 
-    // Imposto la prima e l'ultima pagina di default...
-    book.downloadFrom = 1;
-    book.downloadTo = book.pages.length;
-    // ...e le correggo se sono stati impostati degli intervalli di scaricamento...
-    if (program.range) {
-        logger.debug(`Elaboro ${program.range} come intervallo`);
-        let strings = program.range.split('-');
-        if (strings.length !== 2) {
-            logger.error(`${program.range} non è un intervallo valido`);
-            process.exit(-1);
-        } else {
-            if (!isNaN(strings[0]) && parseInt(strings[0]) > 0) {
-                book.downloadFrom = parseInt(strings[0]);
-                logger.debug('La prima pagina da scaricare è la n. ' + book.downloadFrom);
-            }
-            if (!isNaN(strings[1]) && parseInt(strings[1]) <= book.downloadTo) {
-                book.downloadTo = parseInt(strings[1]);
-                logger.debug('L\'ultima pagina da scaricare è la n. ' + book.downloadTo);
-            }
-        }
-    }
-    // ...o se è impostato lo scaricamento di prova.
-    if (program.test) {
-        book.downloadFrom = 1;
-        book.downloadTo = 10;
-    }
+    
 
     // Imposto gli strumenti per la creazione dei PDF
     global.outputDir = './pdf/';
@@ -135,45 +110,47 @@ async function main() {
     if (program.compile) {
         await compile();
     } else {
-        // Se non è impostata la verbosità, mostrerò la barra di progresso
-        if (!program.verbose) {
-            global.downloadBar = new ProgressBar('Pag. :current di :total [:bar] :percent :etas', {
-                total: (book.downloadTo - book.downloadFrom) + 1
-            });
-        }
-
         // Inzio la routine per scaricare i file
         await getFiles();
 
+        // A meno che non sia richiesto il solo scaricamento o la
+        // compilazione delle singole pagine, compilo un PDF finale
         if (!program.download || !program.single) {
-            logger.debug('Merging all pages into one');
+            logger.debug('Compilo le pagine in una unica');
             if (!fs.existsSync(outputDir)) {
-                logger.debug(`Making ${outputDir}`);
+                logger.debug(`Creo ${outputDir}`);
                 fs.mkdirSync(outputDir);
             }
-            const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
-            logger.debug(`Saving the final PDF as: ${finalPdf}`);
-            merger.save(finalPdf);
+            let range = '';
+            if (program.range) {
+                range = ` - ${program.range}`;
+            }
+            const finalPdf = outputDir + `${Date.now()} - ${book.title}${range}.pdf`;
+            logger.debug(`Salvo il PDF finale come: ${finalPdf}`);
+            await merger.save(finalPdf);
         }
 
+        // Se richiesto, elimino i file temporanei
         if (program.purge) {
             const numberOfFolders = fs.readdirSync(tmpRootDir).length;
             let delDir = tmpRootDir;
-            logger.debug('Deleting all temporary files');
-            logger.debug(`There are ${numberOfFolders} files inside ${delDir}`);
+            logger.debug('Cancello i file temporanei');
+            logger.debug(`Ci sono ${numberOfFolders} file dentro ${delDir}`);
             if (numberOfFolders > 1) {
-                logger.debug(`I'll delete the files regarding ${book.isbn}`);
+                logger.debug(`Cancellerò solo i file riguardanti ${book.isbn}`);
                 delDir = tmpRootDir + book.isbn;
             }
             try {
-                logger.debug(`Deleting ${delDir}`);
+                logger.debug(`Cancello ${delDir}`);
                 del(delDir);
             } catch (err) {
-                logger.error(`There was an errore while deleting ${delDir}.`);
+                logger.error(`C'è stato un errore nella cancellazione di ${delDir}.`);
             }
         }
     }
-    logger.debug('Done. ;)');
+
+    // Esco
+    logger.debug('Fatto. ;)');
     process.exit();
 }
 
@@ -195,10 +172,12 @@ async function compile() {
     // Ottengo l'elenco degli sfondi delle pagine e inizio a compilarli
     const backgrounds = files.filter(file => path.extname(file) === '.jpg');
 
-    // Controllo le proporzioni delle pagine
-    // let rightSize = await checkAspectRatio(`${tmpDir}/${backgrounds[0]}`);
-    // book.realSize.height = rightSize.height;
-    // book.realSize.width = rightSize.width;
+    // Se non è impostata la verbosità, mostrerò la barra di progresso
+    if (!program.verbose) {
+        global.compilationBar = new ProgressBar('pag. :current di :total [:bar] :percent :etas', {
+            total: backgrounds.length
+        });
+    }
 
     for (const background of backgrounds) {
         const paddedPageNumber = background.substr(14, 4);
@@ -212,6 +191,7 @@ async function compile() {
             foreground_filename = false;
         }
         await merge(pageNumber, foreground_filename, background_filename);
+        compilationBar.tick();
     }
     
     const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
@@ -286,6 +266,40 @@ async function getInfo(isbn) {
 }
 
 async function getFiles() {
+    // Imposto la prima e l'ultima pagina di default...
+    book.downloadFrom = 1;
+    book.downloadTo = book.pages.length;
+    // ...e le correggo se sono stati impostati degli intervalli di scaricamento...
+    if (program.range) {
+        logger.debug(`Elaboro ${program.range} come intervallo`);
+        let strings = program.range.split('-');
+        if (strings.length !== 2) {
+            logger.error(`${program.range} non è un intervallo valido`);
+            process.exit(-1);
+        } else {
+            if (!isNaN(strings[0]) && parseInt(strings[0]) > 0) {
+                book.downloadFrom = parseInt(strings[0]);
+                logger.debug('La prima pagina da scaricare è la n. ' + book.downloadFrom);
+            }
+            if (!isNaN(strings[1]) && parseInt(strings[1]) <= book.downloadTo) {
+                book.downloadTo = parseInt(strings[1]);
+                logger.debug('L\'ultima pagina da scaricare è la n. ' + book.downloadTo);
+            }
+        }
+    }
+    // ...o se è impostato lo scaricamento di prova.
+    if (program.test) {
+        book.downloadFrom = 1;
+        book.downloadTo = 10;
+    }
+
+    // Se non è impostata la verbosità, mostrerò la barra di progresso
+    if (!program.verbose) {
+        global.downloadBar = new ProgressBar('pag. :current di :total [:bar] :percent :etas', {
+            total: (book.downloadTo - book.downloadFrom) + 1
+        });
+    }
+
     // Imposto gli header per il download
     const options = {
         headers: {
@@ -296,21 +310,29 @@ async function getFiles() {
     logger.debug(`Scarico ${book.isbn} da pag. ${book.downloadFrom} a pag. ${book.downloadTo}`);
 
     for (let i = book.downloadFrom - 1; i < book.downloadTo; i++) {
+        // Se il numero della pagina è segnato come "defaults"
+        // significa che si è arrivati in fondo.  E comunque
+        // non è una pagina scaricabile.
+        if (book.pages[i].number === "defaults") {
+            continue;
+        }
         logger.debug(`Scarico pag. ${book.pages[i].number} di ${book.downloadTo}`);
 
         // Imposto URL e nomi dei singoli livelli della pagina
         let foreground_url;
-        let background_url;
+        // let background_url;
         let foreground_filename;
         if (book.pages[i].isVector) {
             foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-vectorlayers/${pad(4, book.pages[i].number, '0')}.svg`;
-            background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
+            // background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
             foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.svg`;
         } else {
             foreground_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-textlayers/page${pad(4, book.pages[i].number, '0')}_l1.png`;
-            background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_l.jpg`;
+            // background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_l.jpg`;
             foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.png`;
         }
+
+        const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
         const background_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-bg.jpg`;
         const foreground_path = `${tmpDir}/${foreground_filename}`;
         const background_path = `${tmpDir}/${background_filename}`;
@@ -334,7 +356,7 @@ async function getFiles() {
                     await fetch(foreground_url, options)
                         .then(res => res.text())
                         .then(body => {
-                            const dest = fs.writeFile(foreground_path, body, (err) => {
+                            fs.writeFile(foreground_path, body, (err) => {
                                 if (err) throw err;
                             });
                         })
@@ -410,6 +432,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
     let background_content;
     let foreground_content;
     let template;
+    let pageSize = await checkAspectRatio(background_filename);
 
     // Differenzio i template in base al contenuto del
     // livello superiore (se il testo è raster o vettoriale).
@@ -425,7 +448,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
             } else {
                 foreground_content = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1IDUiIGZpbGwtcnVsZT0iZXZlbm9kZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW1pdGVybGltaXQ9IjIiLz4=';
             }
-            template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%"></div></body></html>`;
+            template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%"></div></body></html>`;
         } catch (err) {
             logger.error(err);
         }
@@ -440,7 +463,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
         } else {
             foreground_content = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
         }
-        template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;"><img src="data:image/png;base64,${foreground_content}" style="width:100%"></div></body></html>`;
+        template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/png;base64,${foreground_content}" style="width:100%"></div></body></html>`;
     }
 
     // Creo il browser e imposto la pagina per il salvataggio in PDF
@@ -455,8 +478,8 @@ async function merge(pageNumber, foreground_filename, background_filename) {
     }
     await page.pdf({
         path: filePath,
-        width: `${book.realSize.width}mm`,
-        height: `${book.realSize.height}mm`,
+        width: `${pageSize.width}mm`,
+        height: `${pageSize.height}mm`,
         scale: contentScale,
         pageRanges: '1',
         printBackground: true
@@ -465,12 +488,12 @@ async function merge(pageNumber, foreground_filename, background_filename) {
     // Se non è richiesta la compilazione delle singole
     // pagine soltanto, aggiungo la pagina al PDF
     if (!program.single) {
-        logger.debug('Adding the page to the final PDF')
+        logger.debug('Aggiungo la pagina al PDF finale')
         merger.add(filePath);
     }
 
     await browser.close();
-};
+}
 
 function printInfo(book) {
     console.log(`Title: ${book.title}`);

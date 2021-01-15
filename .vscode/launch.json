@@ -19,6 +19,18 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Download intervallo",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "outputCapture": "std",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}\\main.js",
+            "args": ["--isbn=9788821448416", "--verbose", "--range=10-"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Cancella dopo download completo",
             "skipFiles": [
                 "<node_internals>/**"

@@ -221,14 +221,20 @@ async function getInfo(isbn) {
     };
 
     // Scarico l'indice
-    logger.debug(`Downloading TOC from ${tmpBook.sources.toc}`);
-    let response = await fetch(tmpBook.sources.toc, options);
+    logger.debug(`Scarico il primo indice da ${tmpBook.sources.toc}`);
+    let response = await fetch(tmpBook.sources.toc, options)
+        .catch(error => {
+            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.toc}`);
+        });
     let data = await response.json();
     tmpBook.title = data.title;
 
     // Scarico l'elenco delle pagine
-    logger.debug(`Downloading page list from ${tmpBook.sources.pages}`);
-    response = await fetch(tmpBook.sources.pages + tmpBook.sources.mock, options);
+    logger.debug(`Scarico l'elenco delle pagine da ${tmpBook.sources.pages}`);
+    response = await fetch(tmpBook.sources.pages + tmpBook.sources.mock, options)
+        .catch(error => {
+            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.pages}`);
+        });
     data = await response.json();
 
     // Imposto le dimensioni delle pagine
@@ -346,6 +352,9 @@ async function getFiles() {
                 .then(res => {
                     const dest = fs.createWriteStream(background_path);
                     res.body.pipe(dest);
+                })
+                .catch(error => {
+                    logger.error(`Si è verificato un problema con il download dello sfondo da ${background_url}`);
                 });
             // ...continuo con il testo cambiando
             // il metodo se è raster o vettoriale...
@@ -360,7 +369,9 @@ async function getFiles() {
                                 if (err) throw err;
                             });
                         })
-                        .catch(err => console.log(err));
+                        .catch(error => {
+                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}`);
+                        });
                 } else {
                     logger.debug('Il testo è raster.');
                     await fetch(foreground_url, options)
@@ -368,7 +379,9 @@ async function getFiles() {
                             const dest = fs.createWriteStream(foreground_path);
                             res.body.pipe(dest);
                         })
-                        .catch(err => console.log(err));
+                        .catch(error => {
+                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}`);
+                        });
                 }
             } else {
                 // ...o salto il download dello sfondo se questo non esiste.

@@ -5,8 +5,8 @@
 
 "use strict";
 
-process.binding('http_parser').HTTPParser = require('http-parser-js').HTTPParser;
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// process.binding('http_parser').HTTPParser = require('http-parser-js').HTTPParser;
+// process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 // Imposto le dipendenze
 const winston = require('winston')
@@ -98,7 +98,7 @@ async function main() {
 
         // Se sono richieste solamente le informazioni, posso uscire.
         if (program.getInfo) {
-            process.exit();
+            process.exit(0);
         }
     }
 
@@ -152,7 +152,7 @@ async function main() {
 
     // Esco
     logger.debug('Fatto. ;)');
-    process.exit();
+    process.exit(0);
 }
 
 async function compile() {
@@ -234,18 +234,28 @@ async function getInfo(isbn) {
     logger.debug(`Scarico il primo indice da ${tmpBook.sources.toc}`);
     let response = await fetch(tmpBook.sources.toc, options)
         .catch(error => {
-            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.toc}. [${error}]`);
+            logger.error(`Si è verificato un problema con il download: [${error}]`);
+            process.exit(2);
         });
-    let data = await response.json();
+    let data = await response.json()
+        .catch(error => {
+            logger.error(`Si è verificato un problema con l'elaborazione della risposta: [${error}]`);
+            process.exit(2);
+        });
     tmpBook.title = data.title;
 
     // Scarico l'elenco delle pagine
     logger.debug(`Scarico l'elenco delle pagine da ${tmpBook.sources.pages}`);
     response = await fetch(tmpBook.sources.pages + tmpBook.sources.mock, options)
         .catch(error => {
-            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.pages}. [${error}]`);
+            logger.error(`Si è verificato un problema con il download: [${error}]`);
+            process.exit(3);
         });
-    data = await response.json();
+    data = await response.json()
+        .catch(error => {
+            logger.error(`Si è verificato un problema con l'elaborazione della risposta: [${error}]`);
+            process.exit(3);
+        });
 
     // Imposto le dimensioni delle pagine
     const px2mm = 1;//2.83;
@@ -364,7 +374,8 @@ async function getFiles() {
                     res.body.pipe(dest);
                 })
                 .catch(error => {
-                    logger.error(`Si è verificato un problema con il download dello sfondo da ${background_url}. [${error}]`);
+                    logger.error(`Si è verificato un problema con il download: [${error}]`);
+                    process.exit(4);
                 });
             // ...continuo con il testo cambiando
             // il metodo se è raster o vettoriale...
@@ -380,7 +391,8 @@ async function getFiles() {
                             });
                         })
                         .catch(error => {
-                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}. [${error}]`);
+                            logger.error(`Si è verificato un problema con il download: [${error}]`);
+                            process.exit(5);
                         });
                 } else {
                     logger.debug('Il testo è raster.');
@@ -390,7 +402,8 @@ async function getFiles() {
                             res.body.pipe(dest);
                         })
                         .catch(error => {
-                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}. [${error}]`);
+                            logger.error(`Si è verificato un problema con il download: [${error}]`);
+                            process.exit(5);
                         });
                 }
             } else {

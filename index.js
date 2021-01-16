@@ -173,8 +173,8 @@ async function compile() {
     const backgrounds = files.filter(file => path.extname(file) === '.jpg');
 
     // Se non è impostata la verbosità, mostrerò la barra di progresso
-    if (!program.verbose) {
-        global.compilationBar = new ProgressBar('pag. :current di :total [:bar] :percent :etas', {
+    if (program.verbose === undefined) {
+        global.compilationBar = new ProgressBar('Compilo pag. :current di :total [:bar] :percent', {
             total: backgrounds.length
         });
     }
@@ -300,8 +300,8 @@ async function getFiles() {
     }
 
     // Se non è impostata la verbosità, mostrerò la barra di progresso
-    if (!program.verbose) {
-        global.downloadBar = new ProgressBar('pag. :current di :total [:bar] :percent :etas', {
+    if (program.verbose === undefined) {
+        global.downloadBar = new ProgressBar('Scarico pag. :current di :total [:bar] :percent', {
             total: (book.downloadTo - book.downloadFrom) + 1
         });
     }

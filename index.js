@@ -53,13 +53,16 @@ async function main() {
     program.parse(process.argv);
 
     // Se ci sono opzioni non compatibili, esco
-    if ((program.dryRun && program.download) || (program.compile && program.download)) {
+    if (
+        (program.dryRun !== undefined && program.download !== undefined) ||
+        (program.compile !== undefined && program.download !== undefined)
+    ) {
         logger.error('Le opzioni non sono compatibili.');
         process.exit(1);
     }
 
     // Se è impostata la verbosità, elevo il livello del logger per mostrare i messaggi di debug
-    if (program.verbose) {
+    if (program.verbose !== undefined) {
         logger.level = 'debug';
         logger.debug(program.opts());
     }
@@ -81,7 +84,7 @@ async function main() {
 
     // Se l'indice non è presente, lo scarico.
     logger.debug(`Cerco ${isbn}`);
-    if (!program.compile || !fs.existsSync(archived_json)) {
+    if (program.compile === undefined || !fs.existsSync(archived_json)) {
         global.book = await getInfo(isbn);
         fs.writeFileSync(archived_json, JSON.stringify(book))
     } else {
@@ -90,7 +93,7 @@ async function main() {
     }
 
     // Se è impostata la verbosità, stampa le informazioni del libro
-    if (program.verbose || program.getInfo) {
+    if (program.verbose !== undefined || program.getInfo !== undefined) {
         printInfo(global.book);
 
         // Se sono richieste solamente le informazioni, posso uscire.
@@ -99,23 +102,21 @@ async function main() {
         }
     }
 
-    
-
     // Imposto gli strumenti per la creazione dei PDF
     global.outputDir = './pdf/';
     const PDFMerger = require('pdf-merger-js');
     global.merger = new PDFMerger();
 
     // Se è richiesta la compilazione, inizio la routine necessaria
-    if (program.compile) {
+    if (program.compile !== undefined) {
         await compile();
     } else {
-        // Inzio la routine per scaricare i file
+        // Inizio la routine per scaricare i file
         await getFiles();
 
         // A meno che non sia richiesto il solo scaricamento o la
         // compilazione delle singole pagine, compilo un PDF finale
-        if (!program.download || !program.single) {
+        if (program.download === undefined || program.single === undefined) {
             logger.debug('Compilo le pagine in una unica');
             if (!fs.existsSync(outputDir)) {
                 logger.debug(`Creo ${outputDir}`);
@@ -131,7 +132,7 @@ async function main() {
         }
 
         // Se richiesto, elimino i file temporanei
-        if (program.purge) {
+        if (program.purge !== undefined) {
             const numberOfFolders = fs.readdirSync(tmpRootDir).length;
             let delDir = tmpRootDir;
             logger.debug('Cancello i file temporanei');
@@ -179,7 +180,16 @@ async function compile() {
         });
     }
 
+    let i = 1;
     for (const background of backgrounds) {
+        if (
+            (program.test !== undefined) &&
+            (i === 10)
+        ) {
+            break;
+        } else {
+            i = i + 1;
+        }
         const paddedPageNumber = background.substr(14, 4);
         const pageNumber = parseInt(paddedPageNumber);
         const background_filename = `${tmpDir}/${background}`;
@@ -196,7 +206,7 @@ async function compile() {
     
     const finalPdf = outputDir + `${Date.now()} - ${book.title}.pdf`;
     logger.debug(`Salvo il PDF finale come ${finalPdf}`);
-    if (!program.single) {
+    if (program.single === undefined) {
         await merger.save(finalPdf);
     }
 }
@@ -276,7 +286,7 @@ async function getFiles() {
     book.downloadFrom = 1;
     book.downloadTo = book.pages.length;
     // ...e le correggo se sono stati impostati degli intervalli di scaricamento...
-    if (program.range) {
+    if (program.range !== undefined) {
         logger.debug(`Elaboro ${program.range} come intervallo`);
         let strings = program.range.split('-');
         if (strings.length !== 2) {
@@ -294,7 +304,7 @@ async function getFiles() {
         }
     }
     // ...o se è impostato lo scaricamento di prova.
-    if (program.test) {
+    if (program.test !== undefined) {
         book.downloadFrom = 1;
         book.downloadTo = 10;
     }
@@ -345,7 +355,7 @@ async function getFiles() {
 
         // A meno che non sia richiesto di evitare
         // i download, inizio a scaricare i livelli...
-        if (!program.dryRun) {
+        if (program.dryRun === undefined) {
             // ...parto dallo sfondo...
             logger.debug(`Scarico lo sfondo: ${background_url}`);
             await fetch(background_url, options)
@@ -391,21 +401,31 @@ async function getFiles() {
 
         // A meno che non sia stato richiesto il semplice download
         // o di non scaricare nulla, procedo con la compilazione
-        if (!program.download || !program.dryRun) {
+        if (
+            !(
+                (program.download !== undefined) ||
+                (program.dryRun !== undefined)
+            )
+        ) {
             const background = background_path;
             const foreground = book.pages[i].hasText ? foreground_path : false;
             await merge(book.pages[i].number, foreground, background);
         }
 
-        // Salto la pausa se è ciò che è stato richiesto
+        // Salto la pausa se è ciò che è stato richiesto,
+        // una pagina sì e una no,
         // o se sono arrivato all'ultima pagina
-        if (!program.fullSpeed && !(i % 2) && (i !== (book.downloadTo - 1))) {
+        if (
+            (program.fullSpeed === undefined) &&
+            !(i % 2) &&
+            (i !== (book.downloadTo - 1))
+        ) {
             await pause(false);
         }
 
         // Se non è impostata la verbosità ma viene
         // usata la barra, avanzo di uno.
-        if (!program.verbose) {
+        if (program.verbose === undefined) {
             downloadBar.tick();
         }
     }
@@ -500,7 +520,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
 
     // Se non è richiesta la compilazione delle singole
     // pagine soltanto, aggiungo la pagina al PDF
-    if (!program.single) {
+    if (program.single === undefined) {
         logger.debug('Aggiungo la pagina al PDF finale')
         merger.add(filePath);
     }

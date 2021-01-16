@@ -18,7 +18,7 @@ const pad = require('pad');
 const del = require('del');
 const ProgressBar = require('progress');
 
-main();
+main().then(() => process.exit(0));
 
 async function main() {
     // Imposto il logger
@@ -234,7 +234,7 @@ async function getInfo(isbn) {
     logger.debug(`Scarico il primo indice da ${tmpBook.sources.toc}`);
     let response = await fetch(tmpBook.sources.toc, options)
         .catch(error => {
-            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.toc}`);
+            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.toc}. [${error}]`);
         });
     let data = await response.json();
     tmpBook.title = data.title;
@@ -243,7 +243,7 @@ async function getInfo(isbn) {
     logger.debug(`Scarico l'elenco delle pagine da ${tmpBook.sources.pages}`);
     response = await fetch(tmpBook.sources.pages + tmpBook.sources.mock, options)
         .catch(error => {
-            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.pages}`);
+            logger.error(`Si è verificato un problema con il download di ${tmpBook.sources.pages}. [${error}]`);
         });
     data = await response.json();
 
@@ -364,7 +364,7 @@ async function getFiles() {
                     res.body.pipe(dest);
                 })
                 .catch(error => {
-                    logger.error(`Si è verificato un problema con il download dello sfondo da ${background_url}`);
+                    logger.error(`Si è verificato un problema con il download dello sfondo da ${background_url}. [${error}]`);
                 });
             // ...continuo con il testo cambiando
             // il metodo se è raster o vettoriale...
@@ -380,7 +380,7 @@ async function getFiles() {
                             });
                         })
                         .catch(error => {
-                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}`);
+                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}. [${error}]`);
                         });
                 } else {
                     logger.debug('Il testo è raster.');
@@ -390,7 +390,7 @@ async function getFiles() {
                             res.body.pipe(dest);
                         })
                         .catch(error => {
-                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}`);
+                            logger.error(`Si è verificato un problema con il download del testo da ${foreground_url}. [${error}]`);
                         });
                 }
             } else {
@@ -481,7 +481,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
             } else {
                 foreground_content = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA1IDUiIGZpbGwtcnVsZT0iZXZlbm9kZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW1pdGVybGltaXQ9IjIiLz4=';
             }
-            template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%"></div></body></html>`;
+            template = `<html lang="en"><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/svg+xml;base64,${foreground_content}" style="width:100%" alt=""></div></body></html>`;
         } catch (err) {
             logger.error(err);
         }
@@ -496,7 +496,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
         } else {
             foreground_content = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
         }
-        template = `<html><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/png;base64,${foreground_content}" style="width:100%"></div></body></html>`;
+        template = `<html lang="en"><body style="margin:0"><div style="background-image: url(data:image/jpg;base64,${background_content});background-size: 100%;width: ${pageSize.width}mm;height: ${pageSize.height}mm;"><img src="data:image/png;base64,${foreground_content}" style="width:100%" alt=""></div></body></html>`;
     }
 
     // Creo il browser e imposto la pagina per il salvataggio in PDF

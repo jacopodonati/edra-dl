@@ -47,6 +47,7 @@ async function main() {
         .option('-p, --purge', 'Rimuovi i file temporanei dopo il download')
         .option('-c, --compile', 'Compila un PDF dalle pagine precedentemente scaricate')
         .option('-s, --single', 'Compila un PDF per ogni pagina')
+        .option('-w, --web', 'Salva la pagina HTML')
         .option('-v, --verbose', 'Mostra più informazioni');
 
     // Processo i parametri
@@ -358,7 +359,8 @@ async function getFiles() {
             foreground_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-fg.png`;
         }
 
-        const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
+        //const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_l.jpg`;
+		const background_url = `https://www.edravet.it/fb/${book.isbn}/files/assets/common/page-html5-substrates/page${pad(4, book.pages[i].number, '0')}_4.jpg`;
         const background_filename = `${book.isbn}-${pad(4, book.pages[i].number, '0')}-bg.jpg`;
         const foreground_path = `${tmpDir}/${foreground_filename}`;
         const background_path = `${tmpDir}/${background_filename}`;
@@ -450,10 +452,11 @@ async function merge(pageNumber, foreground_filename, background_filename) {
     // Inizializzo Puppeteer per la compilazione della
     // pagina e imposto la cartella in cui salvare il file
     const Puppeteer = require('puppeteer');
-    const filePath = `${tmpDir}/${book.isbn}_${pad(4, pageNumber, '0')}.pdf`;
+    const htmlFilePath = `${tmpDir}/${book.isbn}-${pad(4, book.pages[i].number, '0')}-page.html`;
+    const pdfFilePath = `${tmpDir}/${book.isbn}_${pad(4, pageNumber, '0')}.pdf`;
 
     // Controllo di avere tutti i file necessari
-    logger.debug('Cerco i file')
+    logger.debug('Cerco i file');
     do {
         logger.debug(`Attendo lo sfondo della pagina n. ${pageNumber}...`);
 
@@ -523,7 +526,7 @@ async function merge(pageNumber, foreground_filename, background_filename) {
         contentScale = book.pages[pageNumber - 1].contentScale;
     }
     await page.pdf({
-        path: filePath,
+        path: pdfFilePath,
         width: `${pageSize.width}mm`,
         height: `${pageSize.height}mm`,
         scale: contentScale,
@@ -531,11 +534,21 @@ async function merge(pageNumber, foreground_filename, background_filename) {
         printBackground: true
     });
 
+    if (program.web !== undefined) {
+        let bodyHTML = await page.evaluate(() => document.body.innerHTML);
+        fs.writeFile(htmlFilePath, bodyHTML, (err) => {
+            if(err) {
+                throw err;
+            }
+            logger.debug('Pagina HTML salvata');
+        });
+    }
+
     // Se non è richiesta la compilazione delle singole
     // pagine soltanto, aggiungo la pagina al PDF
     if (program.single === undefined) {
         logger.debug('Aggiungo la pagina al PDF finale')
-        merger.add(filePath);
+        merger.add(pdfFilePath);
     }
 
     await browser.close();
